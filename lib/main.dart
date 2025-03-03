@@ -1,9 +1,8 @@
-import 'dart:io'; // For File Handling
-import 'package:camera/camera.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // For Timestamp Formatting
-import 'package:geolocator/geolocator.dart'; // For Geolocation
-import 'location_service.dart'; // Import Location Service
+import 'package:flutter/foundation.dart'; // ✅ Detects Web
+import 'camera_page.dart';
 
 void main() {
   runApp(MyApp());
@@ -25,103 +24,30 @@ class AttendancePage extends StatefulWidget {
 }
 
 class _AttendancePageState extends State<AttendancePage> {
-  CameraController? _controller;
-  late List<CameraDescription> cameras;
-  bool isCameraInitialized = false;
-  bool isError = false;
-  bool isLoading = false;
   String? imagePath;
-  Position? userPosition;
+  Uint8List? imageBytes;
+  String? timestamp;
+  double? latitude;
+  double? longitude;
 
-  @override
-  void initState() {
-    super.initState();
-    initializeCamera();
-    fetchLocation(); // Fetch location on startup
-  }
+  /// Open Camera and retrieve image data
+  Future<void> openCamera() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => CameraPage()),
+    );
 
-  /// Initializes the front camera
-  Future<void> initializeCamera() async {
-    try {
-      cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        setState(() {
-          isError = true;
-        });
-        return;
-      }
-
-      _controller = CameraController(
-        cameras.firstWhere((cam) => cam.lensDirection == CameraLensDirection.front),
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-
-      await _controller!.initialize();
+    if (result != null) {
       setState(() {
-        isCameraInitialized = true;
-      });
-    } catch (e) {
-      print("❌ Camera error: $e");
-      setState(() {
-        isError = true;
-      });
-    }
-  }
+        timestamp = result['timestamp'];
+        latitude = result['latitude'];
+        longitude = result['longitude'];
 
-  /// Fetches the current location of the user
-  Future<void> fetchLocation() async {
-    try {
-      Position position = await LocationService.getUserLocation();
-      setState(() {
-        userPosition = position;
-      });
-    } catch (e) {
-      print("❌ Location error: $e");
-    }
-  }
-
-  /// Captures a selfie and retrieves the timestamp & location
-  Future<void> captureSelfie() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      print("⚠️ Camera not initialized!");
-      return;
-    }
-
-    try {
-      setState(() {
-        isLoading = true;
-      });
-
-      final XFile image = await _controller!.takePicture();
-
-      // Fetch user location before capturing
-      Position currentPosition = await LocationService.getUserLocation();
-      String formattedTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-
-      setState(() {
-        imagePath = image.path;
-        userPosition = currentPosition;
-        isLoading = false;
-      });
-
-      print("📸 Image Captured: ${image.path}");
-      print("⏳ Timestamp: $formattedTime");
-      print("📍 Location: ${currentPosition.latitude}, ${currentPosition.longitude}");
-
-      // Return the captured image with data
-      Navigator.pop(context, {
-        'imagePath': image.path,
-        'timestamp': formattedTime,
-        'latitude': currentPosition.latitude,
-        'longitude': currentPosition.longitude,
-      });
-
-    } catch (e) {
-      print("❌ Error capturing selfie: $e");
-    } finally {
-      setState(() {
-        isLoading = false;
+        if (kIsWeb) {
+          imageBytes = result['imageBytes']; // ✅ Web Fix
+        } else {
+          imagePath = result['imagePath']; // ✅ Mobile Fix
+        }
       });
     }
   }
@@ -129,60 +55,64 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: isError
-          ? Center(child: Text("Error initializing camera"))
-          : isCameraInitialized
-          ? Stack(
-        children: [
-          CameraPreview(_controller!),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: isLoading
-                ? CircularProgressIndicator()
-                : IconButton(
-              icon: Icon(Icons.camera, size: 50, color: Colors.white),
-              onPressed: isLoading ? null : captureSelfie, // Prevent multiple clicks
+      appBar: AppBar(title: Text("Attendance System")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: openCamera,
+              child: Text("Capture Selfie"),
             ),
-          ),
-        ],
-      )
-          : Center(child: CircularProgressIndicator()),
-      floatingActionButton: imagePath != null
-          ? FloatingActionButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text("Captured Image"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  imagePath != null
-                      ? Image.file(File(imagePath!), height: 250, fit: BoxFit.cover)
-                      : Text("No Image Captured"),
-                  SizedBox(height: 10),
-                  if (userPosition != null)
-                    Text("📍 Latitude: ${userPosition!.latitude}, Longitude: ${userPosition!.longitude}"),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("OK"),
-                ),
-              ],
-            ),
-          );
-        },
-        child: Icon(Icons.image),
-      )
-          : null,
-    );
-  }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
+            SizedBox(height: 20),
+
+            // ✅ Show captured image with timestamp & coordinates
+            if ((kIsWeb && imageBytes != null) || (!kIsWeb && imagePath != null))
+              GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text("Captured Image"),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          kIsWeb
+                              ? Image.memory(imageBytes!, fit: BoxFit.cover) // ✅ Web Fix
+                              : Image.file(File(imagePath!), fit: BoxFit.cover), // ✅ Mobile Fix
+                          SizedBox(height: 10),
+                          Text("📅 Timestamp: $timestamp"),
+                          Text("📍 Latitude: $latitude"),
+                          Text("📍 Longitude: $longitude"),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: kIsWeb
+                          ? Image.memory(imageBytes!, width: 100, height: 100, fit: BoxFit.cover) // ✅ Web Fix
+                          : Image.file(File(imagePath!), width: 100, height: 100, fit: BoxFit.cover), // ✅ Mobile Fix
+                    ),
+                    SizedBox(height: 5),
+                    Text("📅 $timestamp", style: TextStyle(fontSize: 12)),
+                    Text("📍 ${latitude?.toStringAsFixed(5)}, ${longitude?.toStringAsFixed(5)}", style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
