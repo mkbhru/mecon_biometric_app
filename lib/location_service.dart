@@ -5,19 +5,30 @@ class LocationService {
     bool serviceEnabled;
     LocationPermission permission;
 
+    // ✅ Check if location services are enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      return Future.error("Location services are disabled.");
+      return Future.error("❌ Location services are disabled.");
     }
 
+    // ✅ Check location permission status
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.deniedForever) {
-        return Future.error("Location permissions are permanently denied.");
+
+      // 🔴 If the user still denies permission, return an error
+      if (permission == LocationPermission.denied) {
+        return Future.error("❌ Location permission denied.");
       }
     }
 
-    return await Geolocator.getCurrentPosition();
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error("❌ Location permissions are permanently denied.");
+    }
+
+    // ✅ Get current GPS location with high accuracy
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
 }
