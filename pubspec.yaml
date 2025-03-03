@@ -27,13 +27,24 @@ environment:
 # dependencies can be manually updated by changing the version numbers below to
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
+#dependencies:
+#  flutter:
+#    sdk: flutter
+
 dependencies:
   flutter:
     sdk: flutter
+  camera: ^0.11.1        # For capturing selfies
+  geolocator: ^13.0.2      # For fetching GPS coordinates
+  permission_handler: ^11.3.0 # For handling camera & location permissions
+  path_provider: ^2.1.2    # For managing local file paths
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+  audioplayers: ^6.2.0
+  mockito: ^5.4.5
 
 dev_dependencies:
   flutter_test:
@@ -55,6 +66,8 @@ flutter:
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
+  assets:
+    - assets/sounds/shutter.mp3
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
@@ -87,3 +100,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+

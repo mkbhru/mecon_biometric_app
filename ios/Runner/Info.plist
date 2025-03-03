@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSCameraUsageDescription</key>
+    <string>We need camera access for taking selfies.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>We need location access for attendance tracking.</string>
+
 </dict>
 </plist>
